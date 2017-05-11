@@ -10,12 +10,16 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
 BOT_NAME = 'Github'
-
+DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
+SCHEDULER = "scrapy_redis.scheduler.Scheduler"
 SPIDER_MODULES = ['Github.spiders']
 NEWSPIDER_MODULE = 'Github.spiders'
 MONGO_URI = 'localhost'
 MONGO_PORT = 27017
 MONGO_DB = 'Github'
+
+REDIS_HOST = '192.168.1.200'
+REDIS_PORT = 6379
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'Github (+http://www.yourdomain.com)'

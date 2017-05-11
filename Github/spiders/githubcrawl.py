@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
-import re
-from scrapy.spiders import Spider
+from Github.scrapy_redis.spiders import RedisSpider
 from scrapy.selector import Selector
 from scrapy.http import Request, FormRequest
 from Github.items import UserItem, RepositoriesItem
@@ -13,11 +12,11 @@ except:
 logger = logging.getLogger('Gitlogger')
 
 
-class GithubSpider(Spider):
+class GithubSpider(RedisSpider):
     name = 'github'
     allowed_domains = ['github.com']
-    # redis_key = "userinfo:start_urls"
-    start_urls = ['https://github.com/elvissong/following']
+    redis_key = "github:start_urls"
+    # start_urls = ['https://github.com/elvissong/following']
     HOST = 'https://github.com'
     custom_settings = {
         'COOKIES_ENABLED': True
@@ -25,14 +24,16 @@ class GithubSpider(Spider):
     crawl_ID = set()  # 待爬取用户
     finished_ID = set()  # 已爬取用户
 
+    # request 头部
     post_headers = {
         "HOST": "github.com",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36",
         "Referer": "https://github.com/",
     }
 
+    # 对带特殊符号的数字进行处理
     def translate_str(self, numstr):
-        num = str(numstr).strip().replace('.', '')
+        num = str(numstr).strip().replace('.', '').replace(',','')
         if num.endswith('k'):
             num = int(num[:-1] + '000')
             return num
@@ -79,7 +80,7 @@ class GithubSpider(Spider):
         following_list = resp.xpath('//li[@class="follow-list-item float-left border-bottom"]/div/a/@href').extract()
         for elme in following_list:
             id = str(elme)[1:].lower()
-            if id not in self.finished_ID and self.crawl_ID.__len__() <100:
+            if id not in self.finished_ID or self.finished_ID.__len__() <10:
                 self.crawl_ID.add(id)
                 yield Request(url='https://github.com/'+id,headers=self.post_headers, callback=self.parse_user,dont_filter=True)
                 yield Request(url='https://github.com/'+id+'/repositories', headers=self.post_headers, callback=self.parse_user_repos, dont_filter=True)
@@ -87,8 +88,11 @@ class GithubSpider(Spider):
         if self.crawl_ID.__len__() :
             id = self.crawl_ID.pop()
             self.finished_ID.add(id)
-            next_url = "https://github.com/{0}/following".format(id)
-            yield Request(url=next_url,headers=self.post_headers,callback=self.parse)
+            if self.finished_ID.__len__() <10:
+                next_url = "https://github.com/{0}/following".format(id)
+                yield Request(url=next_url, headers=self.post_headers, callback=self.parse)
+            else:
+                pass
 
     def parse_user(self, response):
         """获取个人信息"""
@@ -122,7 +126,7 @@ class GithubSpider(Spider):
         repos_urls = response.css('h3 a::attr(href)').extract()
         for url in repos_urls:
             full_url = self.HOST + url
-            Request(url=full_url, headers=self.post_headers, callback=self.parse_repository)
+            yield Request(url=full_url, headers=self.post_headers, callback=self.parse_repository)
         next_url = response.xpath('//div[@class="pagination"]/a[@rel="next"]/@href').extract_first()
         if next_url:
             full_next_url = 'https://github.com' + next_url
@@ -135,8 +139,8 @@ class GithubSpider(Spider):
         resp = Selector(response)
         # //*[@id="js-repo-pjax-container"]/div[1]/div[1]/h1/strong/a
         repo_name = resp.xpath('//h1[@class="public "]/strong/a/text()').extract_first("")
-        # //*[@id="js-repo-pjax-container"]/div[1]/div[1]/h1/span[1]
-        repo_owner_id = resp.xpath('//h1[@class="public "]/span[@class="author"]/text()').extract_first()
+        # // *[ @ id = "js-repo-pjax-container"] / div[1] / div[1] / h1 / span[1] / a
+        repo_owner_id = resp.xpath('//h1[@class="public "]/span[@class="author"]/a/text()').extract_first()
         # //*[@id="js-repo-pjax-container"]/div[1]/div[1]/h1/span[3]/span/a
         repo_is_forked = resp.xpath('//h1[@class="public "]/span[@class="fork-flag"]/span/a/text()').extract_first("")
         # //*[@id="js-repo-pjax-container"]/div[2]/div[1]/div[3]/span[1]
@@ -144,12 +148,23 @@ class GithubSpider(Spider):
         # //*[@id="js-repo-pjax-container"]/div[1]/div[1]/ul/li[3]/a
         repo_fork_num = resp.xpath('//ul[@class="pagehead-actions"]/li[3]/a/text()').extract_first("0")
         # //*[@id="js-repo-pjax-container"]/div[2]/div[1]/div[1]/div/div/span
-        repo_desc = resp.xpath('//div[@class="repository-meta-content col-11 mb-1"]/span/text()').extract()
+        repo_desc = resp.xpath('//div[@class="repository-meta-content col-11 mb-1"]/span/text()').extract_first("")
         # //*[@id="js-repo-pjax-container"]/div[1]/div[1]/ul/li[2]/div/form[2]/a
-        repo_star_num = resp.xpath('//ul[@class="pagehead-actions"]/li[2]/div/form/a/text()').extract_first()
+        repo_star_num = resp.xpath('//ul[@class="pagehead-actions"]/li[2]/div/form/a/text()').extract_first("0")
         #
         repo_tags = resp.xpath('//div[@class="topics-list-container"]/div/a/text()').extract()
         repo_url = response.url
         # //*[@id="js-repo-pjax-container"]/div[2]/div[1]/div[5]/span[1]/span/relative-time
-        repo_last_update = resp.xpath('//span[@itemprop="dateModified"]/relative-time/@datatime').extract_first()
+        repo_last_update = resp.xpath('//span[@itemprop="dateModified"]/relative-time/@datetime').extract_first()
+
+        repoitem['repo_name'] = repo_name
+        repoitem['repo_owner_id'] = repo_owner_id
+        repoitem['repo_is_forked'] = repo_is_forked
+        repoitem['repo_language'] = repo_language
+        repoitem['repo_fork_num'] = self.translate_str(repo_fork_num)
+        repoitem['repo_desc'] = repo_desc.strip()
+        repoitem['repo_star_num'] = self.translate_str(repo_star_num)
+        repoitem['repo_tags'] = repo_tags
+        repoitem['repo_url'] = repo_url
+        repoitem['repo_last_update'] = repo_last_update
         yield repoitem
