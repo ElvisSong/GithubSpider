@@ -10,8 +10,9 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
 BOT_NAME = 'Github'
-DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
-SCHEDULER = "scrapy_redis.scheduler.Scheduler"
+DUPEFILTER_CLASS = "Github.scrapy_redis.dupefilter.RFPDupeFilter"
+SCHEDULER = "Github.scrapy_redis.scheduler.Scheduler"
+SCHEDULER_QUEUE_CLASS = "Github.scrapy_redis.queue.PriorityQueue"
 SPIDER_MODULES = ['Github.spiders']
 NEWSPIDER_MODULE = 'Github.spiders'
 MONGO_URI = 'localhost'

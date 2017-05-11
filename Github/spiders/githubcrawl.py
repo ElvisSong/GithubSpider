@@ -33,7 +33,7 @@ class GithubSpider(RedisSpider):
 
     # 对带特殊符号的数字进行处理
     def translate_str(self, numstr):
-        num = str(numstr).strip().replace('.', '').replace(',','')
+        num = str(numstr).replace('.', '').replace(',','').strip()
         if num.endswith('k'):
             num = int(num[:-1] + '000')
             return num
