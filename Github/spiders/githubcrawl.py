@@ -33,14 +33,15 @@ class GithubSpider(RedisSpider):
 
     # 对带特殊符号的数字进行处理
     def translate_str(self, numstr):
-        num = str(numstr).replace('.', '').replace(',','').strip()
-        if num.endswith('k'):
-            num = int(num[:-1] + '000')
-            return num
-        elif num.endswith('M'):
-            num = int(num[:-1]+'000000')
-            return num
+        numstr = numstr.replace(',','.')
+        if numstr.endswith('k'):
+            num = float(numstr[:-1]) * 1000
+            return int(num)
+        elif numstr.endswith('M'):
+            num = float(numstr[:-1]) * 1000000
+            return int(num)
         else:
+            num = str(numstr).replace('.','').strip()
             return int(num)
 
     def start_requests(self):
@@ -155,7 +156,7 @@ class GithubSpider(RedisSpider):
         repo_tags = resp.xpath('//div[@class="topics-list-container"]/div/a/text()').extract()
         repo_url = response.url
         # //*[@id="js-repo-pjax-container"]/div[2]/div[1]/div[5]/span[1]/span/relative-time
-        repo_last_update = resp.xpath('//span[@itemprop="dateModified"]/relative-time/@datetime').extract_first()
+        repo_last_update = resp.xpath('//span[@class="float-right"]/span/relative-time/@datetime').extract_first()
 
         repoitem['repo_name'] = repo_name
         repoitem['repo_owner_id'] = repo_owner_id
