@@ -74,7 +74,6 @@ DOWNLOADER_MIDDLEWARES = {
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'Github.pipelines.GithubPipeline': 300,
-    # 'Github.pipelines.CommitsPipeline': 200,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
